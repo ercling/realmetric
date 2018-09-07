@@ -1,0 +1,22 @@
+//this is a sample of config.json5
+{
+  db: {
+    host: "mariadb",
+    port: 3306,
+    user: "realmetric",
+    password: "password42",
+    database: "realmetric",
+    charset: "utf8",
+    timeout: 2
+  },
+  MetricNameValidationRegexp: "[^A-Za-z0-9_.]+",
+  SliceNameValidationRegexp: "[^A-Za-z0-9_.]+",
+  Gin: {
+    //debug or release
+    Mode: "debug",
+    Host: "0.0.0.0",
+    Port: 8080,
+    User: "user",
+    Password: "pass",
+  }
+}
