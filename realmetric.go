@@ -120,6 +120,11 @@ func (mc *metricsCache) GetMetricIdByName(metricName string) (int, error) {
 
 func (td *Event) FillMinute() error {
 	time := time2.Unix(td.Time, 0)
+
+	time, err := LocalTime(time)
+	if err != nil {
+		log.Panic(err)
+	}
 	td.Minute = time.Hour()*60 + time.Minute()
 	return nil
 }
@@ -373,4 +378,12 @@ func aggregateEvents(tracks []Event) int {
 
 	}
 	return counter
+}
+
+func LocalTime(t time2.Time) (time2.Time, error) {
+	loc, err := time2.LoadLocation(Conf.TimeZone)
+	if err == nil {
+		t = t.In(loc)
+	}
+	return t, err
 }

@@ -21,4 +21,5 @@
   },
   FlushToDbInterval: 20,
   FlushTotalsInterval: 120,
+  TimeZone: "Europe/Kiev",
 }

@@ -12,6 +12,7 @@ type Config struct {
 	Gin                        GinConfig
 	FlushToDbInterval          int
 	FlushTotalsInterval        int
+	TimeZone                   string
 }
 
 type DbConfig struct {
