@@ -18,5 +18,7 @@
     Port: 8080,
     User: "user",
     Password: "pass",
-  }
+  },
+  FlushToDbInterval: 20,
+  FlushTotalsInterval: 120,
 }

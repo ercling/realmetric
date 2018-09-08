@@ -18,9 +18,10 @@ import (
 	time2 "time"
 )
 
-var MetricsCache metricsCache
+var MCache metricsCache
 var SlicesCache slicesCache
 var DailyMetricsStore DailyMetricsStorage
+var DailyMetricsTotals DailyMetricsTotalsStorage
 var DailySlicesStore DailySlicesStorage
 var Db *sql.DB
 var Conf *Config
@@ -261,9 +262,9 @@ func warmupMetricsCache() {
 		cacheMetrics[name] = id
 
 	}
-	MetricsCache.mu.Lock()
-	MetricsCache.cache = cacheMetrics
-	MetricsCache.mu.Unlock()
+	MCache.mu.Lock()
+	MCache.cache = cacheMetrics
+	MCache.mu.Unlock()
 }
 
 func warmupSlicesCache() {
@@ -303,12 +304,20 @@ func warmupSlicesCache() {
 }
 
 func main() {
-	//start flush ticker
+	//start flush daily_metrics ticker
 	ticker := time2.NewTicker(time2.Duration(Conf.FlushToDbInterval) * time2.Second)
 	go func() {
 		for range ticker.C {
 			DailyMetricsStore.FlushToDb()
 			DailySlicesStore.FlushToDb()
+		}
+	}()
+	//start flush daily_metric_totals ticker
+	ticker2 := time2.NewTicker(time2.Duration(Conf.FlushTotalsInterval) * time2.Second)
+	go func() {
+		for range ticker2.C {
+			DailyMetricsTotals.FlushToDb()
+			//DailySlicesStore.FlushToDb()
 		}
 	}()
 
@@ -339,12 +348,12 @@ func aggregateEvents(tracks []Event) int {
 			continue
 		}
 		event.FillMinute()
-		metricId, err := MetricsCache.GetMetricIdByName(event.Metric)
+		metricId, err := MCache.GetMetricIdByName(event.Metric)
 		if err != nil {
 			log.Println("Cannot get metric id: " + event.Metric)
 			continue
 		}
-		if DailyMetricsStore.Inc(metricId, event) {
+		if DailyMetricsStore.Inc(metricId, event) && DailyMetricsTotals.Inc(metricId, event) {
 			counter++
 		}
 		//slices

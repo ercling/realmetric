@@ -11,6 +11,7 @@ type Config struct {
 	SliceNameValidationRegexp  string
 	Gin                        GinConfig
 	FlushToDbInterval          int
+	FlushTotalsInterval        int
 }
 
 type DbConfig struct {
