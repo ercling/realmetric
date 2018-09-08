@@ -21,6 +21,7 @@ import (
 var MetricsCache metricsCache
 var SlicesCache slicesCache
 var DailyMetricsStore DailyMetricsStorage
+var DailySlicesStore DailySlicesStorage
 var Db *sql.DB
 var Conf *Config
 
@@ -43,11 +44,55 @@ type Event struct {
 	Minute int
 }
 
-func (mc *metricsCache) GetMetricIdByName(metricName string) (int, error) {
-	val, ok := mc.cache[metricName]
+func (sc *slicesCache) GetSliceIdByCategoryAndName(category string, name string) (int, error) {
+	sliceId, ok := sc.cache[category][name]
 	if !ok {
+		sc.mu.Lock()
+		sliceId, ok = sc.cache[category][name]
+		if ok {
+			sc.mu.Unlock()
+			return sliceId, nil
+		}
+
+		crc32category := crc32.ChecksumIEEE([]byte(category))
+		crc32name := crc32.ChecksumIEEE([]byte(name))
+		var id int
+		err := Db.QueryRow("SELECT id FROM slices WHERE category_crc_32=? AND name_crc_32=?", crc32category, crc32name).Scan(&id)
+		if err != nil {
+			//create id
+			stmt, es := Db.Prepare("INSERT IGNORE INTO slices (category, category_crc_32, name, name_crc_32) VALUES (?, ?, ?, ?)")
+			if es != nil {
+				log.Panic(es)
+			}
+			result, err := stmt.Exec(category, crc32category, name, crc32name)
+			if err != nil {
+				log.Panic(err)
+			}
+			insertId, _ := result.LastInsertId()
+			id = int(insertId)
+		}
+		sliceId = id
+		if _, ok = sc.cache[category]; !ok{
+			sc.cache[category] = make(map[string]int)
+		}
+		sc.cache[category][name] = sliceId
+		sc.mu.Unlock()
+	}
+	return sliceId, nil
+}
+
+func (mc *metricsCache) GetMetricIdByName(metricName string) (int, error) {
+	metricId, ok := mc.cache[metricName]
+	if !ok {
+		mc.mu.Lock()
+		metricId, ok = mc.cache[metricName]
+		if ok {
+			mc.mu.Unlock()
+			return metricId, nil
+		}
 		crc32name := crc32.ChecksumIEEE([]byte(metricName))
 		var id int
+
 		err := Db.QueryRow("SELECT id from metrics where name_crc_32=?", crc32name).Scan(&id)
 
 		if err != nil {
@@ -64,10 +109,11 @@ func (mc *metricsCache) GetMetricIdByName(metricName string) (int, error) {
 			id = int(insertId)
 		}
 
-		val = id
-		mc.cache[metricName] = val
+		metricId = id
+		mc.cache[metricName] = metricId
+		mc.mu.Unlock()
 	}
-	return val, nil
+	return metricId, nil
 }
 
 func (td *Event) FillMinute() error {
@@ -236,13 +282,13 @@ func warmupSlicesCache() {
 		var id int
 		var name string
 		var category string
-		err = rows.Scan(&id, &name, &category)
+		err = rows.Scan(&id, &category, &name)
 		if err != nil {
-			log.Println("Skip unresolved metric row")
+			log.Println("Skip unresolved slice row")
 			continue
 		}
 		if r.MatchString(name) {
-			log.Println("Skip metric by regexp: " + name)
+			log.Println("Skip slice by regexp: " + name)
 			continue
 		}
 		if _, ok := cacheSlices[category]; !ok {
@@ -262,6 +308,7 @@ func main() {
 	go func() {
 		for range ticker.C {
 			DailyMetricsStore.FlushToDb()
+			DailySlicesStore.FlushToDb()
 		}
 	}()
 
@@ -300,7 +347,19 @@ func aggregateEvents(tracks []Event) int {
 		if DailyMetricsStore.Inc(metricId, event) {
 			counter++
 		}
+		//slices
+		if event.Slices == nil {
+			continue
+		}
+		for category, name := range event.Slices{
+			sliceId, err := SlicesCache.GetSliceIdByCategoryAndName(category, name)
+			if err != nil {
+				log.Println("Cannot get metric id: " + event.Metric)
+				continue
+			}
+			DailySlicesStore.Inc(metricId, sliceId, event)
+		}
+
 	}
-	//TODO: add slices here
 	return counter
 }
