@@ -23,6 +23,7 @@ var SlicesCache slicesCache
 var DailyMetricsStore DailyMetricsStorage
 var DailyMetricsTotals DailyMetricsTotalsStorage
 var DailySlicesStore DailySlicesStorage
+var DailySlicesTotals DailySlicesTotalsStorage
 var Db *sql.DB
 var Conf *Config
 
@@ -317,7 +318,7 @@ func main() {
 	go func() {
 		for range ticker2.C {
 			DailyMetricsTotals.FlushToDb()
-			//DailySlicesStore.FlushToDb()
+			DailySlicesTotals.FlushToDb()
 		}
 	}()
 
@@ -367,6 +368,7 @@ func aggregateEvents(tracks []Event) int {
 				continue
 			}
 			DailySlicesStore.Inc(metricId, sliceId, event)
+			DailySlicesTotals.Inc(metricId, sliceId, event)
 		}
 
 	}
