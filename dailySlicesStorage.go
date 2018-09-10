@@ -103,7 +103,10 @@ func (store *DailySlicesStorage) FlushToDb() int {
 		//TODO: add error logs
 		if len(vals) > 0 {
 			//prepare the statement
-			stmt, _ := Db.Prepare(sqlStr)
+			stmt, err := Db.Prepare(sqlStr)
+			if err!= nil{
+				log.Panic(err)
+			}
 
 			//format all vals at once
 			stmt.Exec(vals...)
