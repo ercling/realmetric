@@ -9,7 +9,7 @@ import (
 
 type DailySlice struct {
 	metricId  int
-	sliceId int
+	sliceId   int
 	value     int
 	minute    int
 	timestamp int64
@@ -20,7 +20,7 @@ type DailySlicesStorage struct {
 	store map[string]map[string]DailySlice
 }
 
-func (store *DailySlicesStorage) Inc(metricId int,sliceId int, event Event) bool {
+func (store *DailySlicesStorage) Inc(metricId int, sliceId int, event Event) bool {
 	store.mu.Lock()
 	var key string
 	eventTime := time.Unix(event.Time, 0)
@@ -37,7 +37,7 @@ func (store *DailySlicesStorage) Inc(metricId int,sliceId int, event Event) bool
 			val.value = val.value + event.Value
 			store.store[dateKey][key] = val
 		} else {
-			store.store[dateKey][key] = DailySlice{metricId: metricId, sliceId:sliceId, minute: event.Minute, value: event.Value, timestamp: event.Time}
+			store.store[dateKey][key] = DailySlice{metricId: metricId, sliceId: sliceId, minute: event.Minute, value: event.Value, timestamp: event.Time}
 		}
 
 	} else {
@@ -46,7 +46,7 @@ func (store *DailySlicesStorage) Inc(metricId int,sliceId int, event Event) bool
 		if !ok {
 			store.store[dateKey] = make(map[string]DailySlice)
 		}
-		store.store[dateKey][key] = DailySlice{metricId: metricId, sliceId:sliceId, minute: event.Minute, value: event.Value, timestamp: event.Time}
+		store.store[dateKey][key] = DailySlice{metricId: metricId, sliceId: sliceId, minute: event.Minute, value: event.Value, timestamp: event.Time}
 	}
 	store.mu.Unlock()
 	return true
@@ -78,7 +78,7 @@ func (store *DailySlicesStorage) FlushToDb() int {
 				"PRIMARY KEY (`id`)," +
 				"UNIQUE KEY " + uniqueName + " (`metric_id`,`slice_id`,`minute`)," +
 				"KEY " + indexName + " (`metric_id`, `slice_id`)" +
-				//"KEY " + indexName + " (`minute`,)" +
+			//"KEY " + indexName + " (`minute`,)" +
 				") ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci"
 			//TODO: add error log here
 			stmt, err := Db.Prepare(sqlStr)
@@ -101,11 +101,14 @@ func (store *DailySlicesStorage) FlushToDb() int {
 		sqlStr += " ON DUPLICATE KEY UPDATE `value` = `value` + VALUES(`value`)"
 
 		//TODO: add error logs
-		//prepare the statement
-		stmt, _ := Db.Prepare(sqlStr)
+		if len(vals) > 0 {
+			//prepare the statement
+			stmt, _ := Db.Prepare(sqlStr)
 
-		//format all vals at once
-		stmt.Exec(vals...)
+			//format all vals at once
+			stmt.Exec(vals...)
+		}
+
 	}
 	store.store = nil
 

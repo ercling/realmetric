@@ -99,11 +99,13 @@ func (storage *DailyMetricsStorage) FlushToDb() int {
 		sqlStr += " ON DUPLICATE KEY UPDATE `value` = `value` + VALUES(`value`)"
 
 		//TODO: add error logs
-		//prepare the statement
-		stmt, _ := Db.Prepare(sqlStr)
+		if len(vals) > 0 {
+			//prepare the statement
+			stmt, _ := Db.Prepare(sqlStr)
 
-		//format all vals at once
-		stmt.Exec(vals...)
+			//format all vals at once
+			stmt.Exec(vals...)
+		}
 	}
 	storage.storageElements = nil
 
