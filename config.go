@@ -26,11 +26,14 @@ type DbConfig struct {
 }
 
 type GinConfig struct {
-	Mode     string
-	Host     string
-	Port     int
-	User     string
-	Password string
+	Mode            string
+	Host            string
+	Port            int
+	User            string
+	Password        string
+	TlsEnabled      bool
+	TlsCertFilePath string
+	TlsKeyFilePath  string
 }
 
 func (config *Config) Init() error {

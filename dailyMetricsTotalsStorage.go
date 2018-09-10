@@ -64,11 +64,20 @@ func (storage *DailyMetricsTotalsStorage) FlushToDb() int {
 				" (`id` int(10) unsigned NOT NULL AUTO_INCREMENT," +
 				"`metric_id` smallint(5) unsigned NOT NULL," +
 				"`value` int(11) NOT NULL," +
+				"`diff` float NOT NULL DEFAULT '0'," +
 				"PRIMARY KEY (`id`)," +
 				"UNIQUE KEY " + uniqueName + " (`metric_id`)" +
 				") ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci"
 			//TODO: add error log here
-
+//CREATE TABLE `daily_slice_totals_2017_07_14` (
+			//  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+			//  `metric_id` smallint(5) unsigned NOT NULL,
+			//  `slice_id` smallint(5) unsigned NOT NULL,
+			//  `value` int(11) NOT NULL,
+			//  `diff` float NOT NULL DEFAULT '0',
+			//  PRIMARY KEY (`id`),
+			//  UNIQUE KEY `daily_slice_totals_2017_07_14_metric_id_slice_id_unique` (`metric_id`,`slice_id`)
+			//) ENGINE=InnoDB AUTO_INCREMENT=34164 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci
 			stmt, err := Db.Prepare(sqlStr)
 			if err != nil {
 				log.Fatal(err)
@@ -88,12 +97,15 @@ func (storage *DailyMetricsTotalsStorage) FlushToDb() int {
 		sqlStr = sqlStr[0 : len(sqlStr)-1]
 		sqlStr += " ON DUPLICATE KEY UPDATE `value` = `value` + VALUES(`value`)"
 
-		//TODO: add error logs
-		//prepare the statement
-		stmt, _ := Db.Prepare(sqlStr)
+		if len(vals) > 0 {
+			//TODO: add error logs
+			//prepare the statement
+			stmt, _ := Db.Prepare(sqlStr)
 
-		//format all vals at once
-		stmt.Exec(vals...)
+			//insert all vals at once
+			stmt.Exec(vals...)
+		}
+
 	}
 	storage.storageElements = nil
 

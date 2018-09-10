@@ -12,7 +12,7 @@ type DailySlicesTotalsStorage struct {
 	store map[string]map[string]DailySlice
 }
 
-func (store *DailySlicesTotalsStorage) Inc(metricId int,sliceId int, event Event) bool {
+func (store *DailySlicesTotalsStorage) Inc(metricId int, sliceId int, event Event) bool {
 	store.mu.Lock()
 	var key string
 	eventTime := time.Unix(event.Time, 0)
@@ -29,7 +29,7 @@ func (store *DailySlicesTotalsStorage) Inc(metricId int,sliceId int, event Event
 			val.value = val.value + event.Value
 			store.store[dateKey][key] = val
 		} else {
-			store.store[dateKey][key] = DailySlice{metricId: metricId, sliceId:sliceId, value: event.Value}
+			store.store[dateKey][key] = DailySlice{metricId: metricId, sliceId: sliceId, value: event.Value}
 		}
 
 	} else {
@@ -38,7 +38,7 @@ func (store *DailySlicesTotalsStorage) Inc(metricId int,sliceId int, event Event
 		if !ok {
 			store.store[dateKey] = make(map[string]DailySlice)
 		}
-		store.store[dateKey][key] = DailySlice{metricId: metricId, sliceId:sliceId, value: event.Value}
+		store.store[dateKey][key] = DailySlice{metricId: metricId, sliceId: sliceId, value: event.Value}
 	}
 	store.mu.Unlock()
 	return true
@@ -65,6 +65,7 @@ func (store *DailySlicesTotalsStorage) FlushToDb() int {
 				"`metric_id` smallint(5) unsigned NOT NULL," +
 				"`slice_id` smallint(5) unsigned NOT NULL," +
 				"`value` int(11) NOT NULL," +
+				"`diff` float NOT NULL DEFAULT '0'," +
 				"PRIMARY KEY (`id`)," +
 				"UNIQUE KEY " + uniqueName + " (`metric_id`,`slice_id`)" +
 				") ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci"
@@ -90,10 +91,11 @@ func (store *DailySlicesTotalsStorage) FlushToDb() int {
 
 		//TODO: add error logs
 		//prepare the statement
-		stmt, _ := Db.Prepare(sqlStr)
-
-		//format all vals at once
-		stmt.Exec(vals...)
+		if len(vals) > 0 {
+			stmt, _ := Db.Prepare(sqlStr)
+			//insert all vals at once
+			stmt.Exec(vals...)
+		}
 	}
 	store.store = nil
 

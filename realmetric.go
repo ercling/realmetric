@@ -5,6 +5,7 @@ import (
 	"compress/zlib"
 	"database/sql"
 	"encoding/json"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
 	"hash/crc32"
@@ -330,6 +331,11 @@ func main() {
 	//setup gin
 	gin.SetMode(Conf.Gin.Mode)
 	server := gin.Default()
+	//add cors
+	config := cors.DefaultConfig()
+	config.AllowCredentials = true
+	config.AllowAllOrigins = true
+	server.Use(cors.New(config))
 	authorized := server.Group("/", gin.BasicAuth(gin.Accounts{Conf.Gin.User: Conf.Gin.Password}))
 
 	server.GET("/ping", func(c *gin.Context) {
@@ -338,7 +344,12 @@ func main() {
 		})
 	})
 	authorized.POST("/track", trackHandler)
-	server.Run(Conf.Gin.Host + ":" + strconv.Itoa(Conf.Gin.Port))
+	if Conf.Gin.TlsEnabled {
+		server.RunTLS(Conf.Gin.Host + ":" + strconv.Itoa(Conf.Gin.Port), Conf.Gin.TlsCertFilePath, Conf.Gin.TlsKeyFilePath)
+	} else {
+		server.Run(Conf.Gin.Host + ":" + strconv.Itoa(Conf.Gin.Port))
+	}
+
 }
 
 func aggregateEvents(tracks []Event) int {
