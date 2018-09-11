@@ -11,10 +11,12 @@ import (
 	"hash/crc32"
 	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	time2 "time"
 )
@@ -27,6 +29,47 @@ var DailySlicesStore DailySlicesStorage
 var DailySlicesTotals DailySlicesTotalsStorage
 var Db *sql.DB
 var Conf *Config
+
+type InsertData struct {
+	TableName string
+	Values    []interface{}
+	GroupCount int
+}
+
+func (portions *InsertData) AppendValues(args ...interface{}) {
+	portions.Values = append(portions.Values, args)
+}
+
+func (portions *InsertData) InsertBatch() {
+	portionCount := 40000
+	currPortionNumber := 0
+	countOfPortions := int(math.Ceil(float64(cap(portions.Values)) / float64(portionCount)))
+
+	for currPortionNumber < countOfPortions {
+		startSlice := portionCount * currPortionNumber
+		endSlice := portionCount * (currPortionNumber + 1)
+
+		currCap := cap(portions.Values)
+		if currCap < endSlice {
+			endSlice = currCap
+		}
+		Slice := portions.Values[startSlice:endSlice]
+		groupRepeatCount := (endSlice-startSlice) / portions.GroupCount
+		SqlStr := "INSERT INTO " + portions.TableName + " (metric_id, slice_id, value, minute) VALUES "
+
+		questionGroup := strings.Repeat("?,", portions.GroupCount)
+		questionGroup = questionGroup[0:len(questionGroup)-1]
+		SqlStr += strings.Repeat("(" + questionGroup + "),", groupRepeatCount)
+		SqlStr = SqlStr[0 : len(SqlStr)-1]
+		SqlStr += " ON DUPLICATE KEY UPDATE `value` = `value` + VALUES(`value`)"
+		stmt, err := Db.Prepare(SqlStr)
+		if err != nil {
+			log.Panic(err)
+		}
+		stmt.Exec(Slice...)
+		currPortionNumber++
+	}
+}
 
 type metricsCache struct {
 	mu    sync.Mutex
