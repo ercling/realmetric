@@ -87,25 +87,14 @@ func (storage *DailyMetricsStorage) FlushToDb() int {
 			tableCreated = true
 		}
 
-		//insert rows
-		sqlStr := "INSERT INTO " + tableName + " (metric_id, value, minute) VALUES "
+		insertData := InsertData{
+			TableName: tableName,
+			Fields:    []string{"metric_id", "value", "minute"}}
 
 		for _, dailyMetric := range values {
-			sqlStr += "(?, ?, ?),"
-			vals = append(vals, dailyMetric.metricId, dailyMetric.value, dailyMetric.minute)
+			insertData.AppendValues(dailyMetric.metricId, dailyMetric.value, dailyMetric.minute)
 		}
-		//trim the last ,
-		sqlStr = sqlStr[0 : len(sqlStr)-1]
-		sqlStr += " ON DUPLICATE KEY UPDATE `value` = `value` + VALUES(`value`)"
-
-		//TODO: add error logs
-		if len(vals) > 0 {
-			//prepare the statement
-			stmt, _ := Db.Prepare(sqlStr)
-
-			//format all vals at once
-			stmt.Exec(vals...)
-		}
+		insertData.InsertIncrementBatch()
 	}
 	storage.storageElements = nil
 

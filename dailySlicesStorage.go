@@ -80,21 +80,26 @@ func (store *DailySlicesStorage) FlushToDb() int {
 				"KEY " + indexName + " (`metric_id`, `slice_id`)" +
 			//"KEY " + indexName + " (`minute`,)" +
 				") ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci"
-			//TODO: add error log here
+
 			stmt, err := Db.Prepare(sqlStr)
 			if err != nil {
 				log.Fatal(err)
 			}
-			stmt.Exec()
+			_, err = stmt.Exec()
+			if err != nil {
+				log.Fatal(err)
+			}
 			tableCreated = true
 		}
 
 		//insert rows
-		insertData := InsertData{GroupCount:4}
+		insertData := InsertData{
+			TableName: tableName,
+			Fields:    []string{"metric_id", "slice_id", "value", "minute"}}
 		for _, dailySlice := range values {
 			insertData.AppendValues(dailySlice.metricId, dailySlice.sliceId, dailySlice.value, dailySlice.minute)
 		}
-		insertData.InsertBatch()
+		insertData.InsertIncrementBatch()
 
 	}
 	store.store = nil

@@ -32,15 +32,15 @@ var Conf *Config
 
 type InsertData struct {
 	TableName string
+	Fields []string
 	Values    []interface{}
-	GroupCount int
 }
 
 func (portions *InsertData) AppendValues(args ...interface{}) {
-	portions.Values = append(portions.Values, args)
+	portions.Values = append(portions.Values, args...)
 }
 
-func (portions *InsertData) InsertBatch() {
+func (portions *InsertData) InsertIncrementBatch() {
 	portionCount := 40000
 	currPortionNumber := 0
 	countOfPortions := int(math.Ceil(float64(cap(portions.Values)) / float64(portionCount)))
@@ -54,10 +54,11 @@ func (portions *InsertData) InsertBatch() {
 			endSlice = currCap
 		}
 		Slice := portions.Values[startSlice:endSlice]
-		groupRepeatCount := (endSlice-startSlice) / portions.GroupCount
-		SqlStr := "INSERT INTO " + portions.TableName + " (metric_id, slice_id, value, minute) VALUES "
+		groupRepeatCount := (endSlice-startSlice) / len(portions.Fields)
+		fieldsStr := strings.Join(portions.Fields, ",")
+		SqlStr := "INSERT INTO " + portions.TableName + " ("+fieldsStr+") VALUES "
 
-		questionGroup := strings.Repeat("?,", portions.GroupCount)
+		questionGroup := strings.Repeat("?,", len(portions.Fields))
 		questionGroup = questionGroup[0:len(questionGroup)-1]
 		SqlStr += strings.Repeat("(" + questionGroup + "),", groupRepeatCount)
 		SqlStr = SqlStr[0 : len(SqlStr)-1]

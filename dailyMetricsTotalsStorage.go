@@ -7,7 +7,7 @@ import (
 )
 
 type DailyMetricsTotalsStorage struct {
-	mu    sync.Mutex
+	mu              sync.Mutex
 	storageElements map[string]map[int]DailyMetric
 }
 
@@ -69,7 +69,7 @@ func (storage *DailyMetricsTotalsStorage) FlushToDb() int {
 				"UNIQUE KEY " + uniqueName + " (`metric_id`)" +
 				") ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci"
 			//TODO: add error log here
-//CREATE TABLE `daily_slice_totals_2017_07_14` (
+			//CREATE TABLE `daily_slice_totals_2017_07_14` (
 			//  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
 			//  `metric_id` smallint(5) unsigned NOT NULL,
 			//  `slice_id` smallint(5) unsigned NOT NULL,
@@ -86,25 +86,14 @@ func (storage *DailyMetricsTotalsStorage) FlushToDb() int {
 			tableCreated = true
 		}
 
-		//insert rows
-		sqlStr := "INSERT INTO " + tableName + " (metric_id, value) VALUES "
+		insertData := InsertData{
+			TableName: tableName,
+			Fields:    []string{"metric_id", "value"}}
 
 		for _, dailyMetric := range values {
-			sqlStr += "(?, ?),"
-			vals = append(vals, dailyMetric.metricId, dailyMetric.value)
+			insertData.AppendValues(dailyMetric.metricId, dailyMetric.value)
 		}
-		//trim the last ,
-		sqlStr = sqlStr[0 : len(sqlStr)-1]
-		sqlStr += " ON DUPLICATE KEY UPDATE `value` = `value` + VALUES(`value`)"
-
-		if len(vals) > 0 {
-			//TODO: add error logs
-			//prepare the statement
-			stmt, _ := Db.Prepare(sqlStr)
-
-			//insert all vals at once
-			stmt.Exec(vals...)
-		}
+		insertData.InsertIncrementBatch()
 
 	}
 	storage.storageElements = nil
@@ -112,4 +101,3 @@ func (storage *DailyMetricsTotalsStorage) FlushToDb() int {
 	storage.mu.Unlock()
 	return len(vals)
 }
-

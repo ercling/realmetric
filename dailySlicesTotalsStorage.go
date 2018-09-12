@@ -78,24 +78,15 @@ func (store *DailySlicesTotalsStorage) FlushToDb() int {
 			tableCreated = true
 		}
 
-		//insert rows
-		sqlStr := "INSERT INTO " + tableName + " (metric_id, slice_id, value) VALUES "
+		insertData := InsertData{
+			TableName: tableName,
+			Fields:    []string{"metric_id", "slice_id", "value"}}
 
 		for _, dailySlice := range values {
-			sqlStr += "(?, ?, ?),"
-			vals = append(vals, dailySlice.metricId, dailySlice.sliceId, dailySlice.value)
+			insertData.AppendValues(dailySlice.metricId, dailySlice.sliceId, dailySlice.value)
 		}
-		//trim the last ,
-		sqlStr = sqlStr[0 : len(sqlStr)-1]
-		sqlStr += " ON DUPLICATE KEY UPDATE `value` = `value` + VALUES(`value`)"
+		insertData.InsertIncrementBatch()
 
-		//TODO: add error logs
-		//prepare the statement
-		if len(vals) > 0 {
-			stmt, _ := Db.Prepare(sqlStr)
-			//insert all vals at once
-			stmt.Exec(vals...)
-		}
 	}
 	store.store = nil
 
