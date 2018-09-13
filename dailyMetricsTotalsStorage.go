@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -9,11 +10,14 @@ import (
 type DailyMetricsTotalsStorage struct {
 	mu              sync.Mutex
 	storageElements map[string]map[int]DailyMetric
+	tmpMu sync.Mutex
+	tmpStorageElements map[string]map[int]DailyMetric
 }
 
 //TODO: try to refactor (add interface)
 func (storage *DailyMetricsTotalsStorage) Inc(metricId int, event Event) bool {
 	storage.mu.Lock()
+
 	var key int
 	eventTime := time.Unix(event.Time, 0)
 	eventTime, err := LocalTime(eventTime)
@@ -45,17 +49,24 @@ func (storage *DailyMetricsTotalsStorage) Inc(metricId int, event Event) bool {
 }
 
 func (storage *DailyMetricsTotalsStorage) FlushToDb() int {
+	startTime:=time.Now()
 	storage.mu.Lock()
+	storage.tmpMu.Lock()
+	storage.tmpStorageElements=storage.storageElements
+	storage.storageElements = nil
+	storage.mu.Unlock()
+
 	vals := []interface{}{}
-	if storage.storageElements == nil {
+	if storage.tmpStorageElements == nil {
 		//log.Println("DailyMetricsStore is empty")
-		storage.mu.Unlock()
+		storage.tmpMu.Unlock()
 		return 0
 	}
 	log.Println(time.Now().Format("15:04:05 ") + "Flushing DailyMetricsTotalsStorage")
 
 	tableCreated := false
-	for dateKey, values := range storage.storageElements {
+	for dateKey, values := range storage.tmpStorageElements {
+		log.Println("DailyMetricsTotalsStorage dk("+strconv.Itoa(len(values))+")")
 		tableName := "daily_metric_totals_" + dateKey
 		//create table
 		if !tableCreated {
@@ -96,8 +107,9 @@ func (storage *DailyMetricsTotalsStorage) FlushToDb() int {
 		insertData.InsertIncrementBatch()
 
 	}
-	storage.storageElements = nil
+	storage.tmpStorageElements = nil
 
-	storage.mu.Unlock()
+	storage.tmpMu.Unlock()
+	log.Println(time.Now().Format("15:04:05 ") + "Done Flushing DailyMetricsTotalsStorage. Elapsed:"+time.Since(startTime).String())
 	return len(vals)
 }

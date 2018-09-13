@@ -17,6 +17,8 @@ type DailyMetric struct {
 type DailyMetricsStorage struct {
 	mu              sync.Mutex
 	storageElements map[string]map[string]DailyMetric
+	tmpMu              sync.Mutex
+	tmpStorage map[string]map[string]DailyMetric
 }
 
 func (storage *DailyMetricsStorage) Inc(metricId int, event Event) bool {
@@ -52,17 +54,23 @@ func (storage *DailyMetricsStorage) Inc(metricId int, event Event) bool {
 }
 
 func (storage *DailyMetricsStorage) FlushToDb() int {
+	startTime := time.Now()
 	storage.mu.Lock()
+	storage.tmpMu.Lock()
+	storage.tmpStorage = storage.storageElements
+	storage.storageElements = nil
+	storage.mu.Unlock()
 	vals := []interface{}{}
-	if storage.storageElements == nil {
+	if storage.tmpStorage == nil {
 		//log.Println("DailyMetricsStore is empty")
-		storage.mu.Unlock()
+		storage.tmpMu.Unlock()
 		return 0
 	}
-	log.Println(time.Now().Format("15:04:05 ") + "Flushing DailyMetricsStorage")
+	log.Println(time.Now().Format("15:04:05 ") + "Start Flushing DailyMetricsStorage")
 
 	tableCreated := false
-	for dateKey, values := range storage.storageElements {
+	for dateKey, values := range storage.tmpStorage {
+		log.Println("DailyMetricsStorage dk("+strconv.Itoa(len(values))+")")
 		tableName := "daily_metrics_" + dateKey
 		//create table
 		if !tableCreated {
@@ -96,8 +104,10 @@ func (storage *DailyMetricsStorage) FlushToDb() int {
 		}
 		insertData.InsertIncrementBatch()
 	}
-	storage.storageElements = nil
+	storage.tmpStorage = nil
+	storage.tmpMu.Unlock()
 
-	storage.mu.Unlock()
+	log.Println(time.Now().Format("15:04:05 ") + "Done Flushing DailyMetricsStorage. Elapsed:"+time.Since(startTime).String())
+
 	return len(vals)
 }

@@ -8,12 +8,14 @@ import (
 )
 
 type DailySlicesTotalsStorage struct {
-	mu    sync.Mutex
-	store map[string]map[string]DailySlice
+	mu              sync.Mutex
+	storageElements map[string]map[string]DailySlice
+	tmpMu sync.Mutex
+	tmpStorageElements map[string]map[string]DailySlice
 }
 
-func (store *DailySlicesTotalsStorage) Inc(metricId int, sliceId int, event Event) bool {
-	store.mu.Lock()
+func (storage *DailySlicesTotalsStorage) Inc(metricId int, sliceId int, event Event) bool {
+	storage.mu.Lock()
 	var key string
 	eventTime := time.Unix(event.Time, 0)
 	eventTime, err := LocalTime(eventTime)
@@ -22,39 +24,46 @@ func (store *DailySlicesTotalsStorage) Inc(metricId int, sliceId int, event Even
 	}
 	dateKey := eventTime.Format("2006_01_02")
 	key = strconv.Itoa(metricId) + "_" + strconv.Itoa(sliceId)
-	_, ok := store.store[dateKey]
+	_, ok := storage.storageElements[dateKey]
 	if ok {
-		val, ok := store.store[dateKey][key]
+		val, ok := storage.storageElements[dateKey][key]
 		if ok {
 			val.value = val.value + event.Value
-			store.store[dateKey][key] = val
+			storage.storageElements[dateKey][key] = val
 		} else {
-			store.store[dateKey][key] = DailySlice{metricId: metricId, sliceId: sliceId, value: event.Value}
+			storage.storageElements[dateKey][key] = DailySlice{metricId: metricId, sliceId: sliceId, value: event.Value}
 		}
 
 	} else {
-		store.store = make(map[string]map[string]DailySlice)
-		_, ok := store.store[dateKey]
+		storage.storageElements = make(map[string]map[string]DailySlice)
+		_, ok := storage.storageElements[dateKey]
 		if !ok {
-			store.store[dateKey] = make(map[string]DailySlice)
+			storage.storageElements[dateKey] = make(map[string]DailySlice)
 		}
-		store.store[dateKey][key] = DailySlice{metricId: metricId, sliceId: sliceId, value: event.Value}
+		storage.storageElements[dateKey][key] = DailySlice{metricId: metricId, sliceId: sliceId, value: event.Value}
 	}
-	store.mu.Unlock()
+	storage.mu.Unlock()
 	return true
 }
 
-func (store *DailySlicesTotalsStorage) FlushToDb() int {
-	store.mu.Lock()
+func (storage *DailySlicesTotalsStorage) FlushToDb() int {
+	startTime := time.Now()
+	storage.mu.Lock()
+	storage.tmpMu.Lock()
+	storage.tmpStorageElements=storage.storageElements
+	storage.storageElements = nil
+	storage.mu.Unlock()
+
 	vals := []interface{}{}
-	if store.store == nil {
-		store.mu.Unlock()
+	if storage.tmpStorageElements == nil {
+		storage.tmpMu.Unlock()
 		return 0
 	}
 	log.Println(time.Now().Format("15:04:05 ") + "Flushing DailySlicesTotals")
 
 	tableCreated := false
-	for dateKey, values := range store.store {
+	for dateKey, values := range storage.tmpStorageElements {
+		log.Println("DailySlicesTotals dk("+strconv.Itoa(len(values))+")")
 		tableName := "daily_slice_totals_" + dateKey
 		//create table
 		if !tableCreated {
@@ -88,8 +97,9 @@ func (store *DailySlicesTotalsStorage) FlushToDb() int {
 		insertData.InsertIncrementBatch()
 
 	}
-	store.store = nil
+	storage.tmpStorageElements = nil
 
-	store.mu.Unlock()
+	storage.tmpMu.Unlock()
+	log.Println(time.Now().Format("15:04:05 ") + "Done Flushing DailySlicesTotals. Elapsed:"+time.Since(startTime).String())
 	return len(vals)
 }

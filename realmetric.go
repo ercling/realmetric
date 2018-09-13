@@ -8,11 +8,13 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/gorilla/mux"
 	"hash/crc32"
 	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"regexp"
 	"strconv"
@@ -63,11 +65,16 @@ func (portions *InsertData) InsertIncrementBatch() {
 		SqlStr += strings.Repeat("(" + questionGroup + "),", groupRepeatCount)
 		SqlStr = SqlStr[0 : len(SqlStr)-1]
 		SqlStr += " ON DUPLICATE KEY UPDATE `value` = `value` + VALUES(`value`)"
+		if portions.TableName=="daily_metric_totals_2018_09_13" {
+			log.Println(SqlStr)
+		}
+
 		stmt, err := Db.Prepare(SqlStr)
 		if err != nil {
 			log.Panic(err)
 		}
 		stmt.Exec(Slice...)
+
 		currPortionNumber++
 	}
 }
@@ -256,10 +263,10 @@ func trackHandler(c *gin.Context) {
 	//
 	//}
 
-	createdEvents := aggregateEvents(tracks)
+	go aggregateEvents(tracks)
 
 	c.JSON(http.StatusAccepted, gin.H{
-		"createdEvents": createdEvents,
+		"createdEvents": 42,
 		"_timing":       time2.Since(startTime).Nanoseconds(),
 	})
 
@@ -355,6 +362,28 @@ func warmupSlicesCache() {
 }
 
 func main() {
+	//DailySlicesTotals = DailySlicesTotalsStorage{}
+	//DailyMetricsStore = DailyMetricsStorage{}
+	//DailyMetricsTotals = DailyMetricsTotalsStorage{}
+	//DailySlicesStore = DailySlicesStorage{}
+	//DailySlicesTotals = DailySlicesTotalsStorage{}
+
+	go func() {
+		debugR := mux.NewRouter()
+		debugR.HandleFunc("/debug/pprof/", pprof.Index)
+		debugR.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		debugR.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		debugR.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		debugR.Handle("/debug/pprof/heap", pprof.Handler("heap"))
+		debugR.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
+		debugR.Handle("/debug/pprof/block", pprof.Handler("block"))
+		debugR.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
+		err := http.ListenAndServe("localhost:6060", debugR)
+		if err != nil {
+			log.Println(err)
+		}
+	}()
+
 	//start flush daily_metrics ticker
 	ticker := time2.NewTicker(time2.Duration(Conf.FlushToDbInterval) * time2.Second)
 	go func() {
@@ -403,6 +432,7 @@ func aggregateEvents(tracks []Event) int {
 	}
 
 	counter := 0
+	//DailySlicesStore.Lock()
 	for _, event := range tracks {
 		if r.MatchString(event.Metric) {
 			log.Println("Skip invalid metric: " + event.Metric)
@@ -421,6 +451,7 @@ func aggregateEvents(tracks []Event) int {
 		if event.Slices == nil {
 			continue
 		}
+
 		for category, name := range event.Slices{
 			sliceId, err := SlicesCache.GetSliceIdByCategoryAndName(category, name)
 			if err != nil {
@@ -431,14 +462,16 @@ func aggregateEvents(tracks []Event) int {
 			DailySlicesTotals.Inc(metricId, sliceId, event)
 		}
 
+
 	}
+	//DailySlicesStore.Unlock()
 	return counter
 }
 
 func LocalTime(t time2.Time) (time2.Time, error) {
-	loc, err := time2.LoadLocation(Conf.TimeZone)
-	if err == nil {
-		t = t.In(loc)
-	}
-	return t, err
+	//loc, err := time2.LoadLocation(Conf.TimeZone)
+	//if err == nil {
+	//	t = t.In(loc)
+	//}
+	return t, nil
 }
