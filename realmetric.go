@@ -57,6 +57,7 @@ func (portions *InsertData) InsertIncrementBatch() {
 		}
 		Slice := portions.Values[startSlice:endSlice]
 		groupRepeatCount := (endSlice-startSlice) / len(portions.Fields)
+		log.Println("endSlice: "+strconv.Itoa(endSlice)+" startSlice: "+strconv.Itoa(startSlice)+" portionLenFields: "+strconv.Itoa(len(portions.Fields))+" SlicesLen:"+strconv.Itoa(len(Slice)))
 		fieldsStr := strings.Join(portions.Fields, ",")
 		SqlStr := "INSERT INTO " + portions.TableName + " ("+fieldsStr+") VALUES "
 
@@ -73,7 +74,13 @@ func (portions *InsertData) InsertIncrementBatch() {
 		if err != nil {
 			log.Panic(err)
 		}
-		stmt.Exec(Slice...)
+		_, err = stmt.Exec(Slice...)
+		if err != nil {
+			log.Println(err)
+			bytesJ, _ := json.Marshal(Slice)
+			log.Println(string(bytesJ))
+
+		}
 
 		currPortionNumber++
 	}
