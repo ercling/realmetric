@@ -75,6 +75,7 @@ func (portions *InsertData) InsertIncrementBatch() {
 			log.Panic(err)
 		}
 		_, err = stmt.Exec(Slice...)
+		stmt.Close()
 		if err != nil {
 			log.Print("Table: " + portions.TableName + " ")
 			log.Println(err)
@@ -291,9 +292,9 @@ func init() {
 	}
 	Db = db
 
+	createTables()
 	warmupMetricsCache()
 	warmupSlicesCache()
-	createTables()
 }
 
 func createTables(){
@@ -317,7 +318,7 @@ func createTables(){
 	}
 
 	//monthly_slices
-	sqlStr = "CREATE TABLE `monthly_slices` ("+
+	sqlStr = "CREATE TABLE IF NOT EXISTS `monthly_slices` ("+
 	"`id` int(10) unsigned NOT NULL AUTO_INCREMENT,"+
 		"`metric_id` smallint(5) unsigned NOT NULL,"+
 		"`slice_id` smallint(5) unsigned NOT NULL,"+
@@ -338,7 +339,7 @@ func createTables(){
 	}
 
 	//metrics
-	sqlStr = "CREATE TABLE `metrics` ("+
+	sqlStr = "CREATE TABLE IF NOT EXISTS `metrics` ("+
 	"`id` int(10) unsigned NOT NULL AUTO_INCREMENT,"+
 		"`name` varchar(255) COLLATE utf8_unicode_ci NOT NULL,"+
 		"`name_crc_32` int(10) unsigned NOT NULL,"+
@@ -356,7 +357,7 @@ func createTables(){
 	}
 
 	//slices
-	sqlStr = "CREATE TABLE `slices` ("+
+	sqlStr = "CREATE TABLE IF NOT EXISTS `slices` ("+
 	"`id` int(10) unsigned NOT NULL AUTO_INCREMENT,"+
 		"`category` varchar(255) COLLATE utf8_unicode_ci NOT NULL,"+
 		"`category_crc_32` int(10) unsigned NOT NULL,"+

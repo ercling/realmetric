@@ -106,6 +106,7 @@ func (storage *DailySlicesStorage) FlushToDb() int {
 			if err != nil {
 				log.Fatal(err)
 			}
+			stmt.Close()
 			tableCreated = true
 		}
 

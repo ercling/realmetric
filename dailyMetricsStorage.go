@@ -92,6 +92,7 @@ func (storage *DailyMetricsStorage) FlushToDb() int {
 				log.Fatal(err)
 			}
 			stmt.Exec()
+			stmt.Close()
 			tableCreated = true
 		}
 
