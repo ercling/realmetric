@@ -293,6 +293,86 @@ func init() {
 
 	warmupMetricsCache()
 	warmupSlicesCache()
+	createTables()
+}
+
+func createTables(){
+	//monthly_metrics
+	sqlStr := "CREATE TABLE IF NOT EXISTS `monthly_metrics` ("+
+	"`id` int(10) unsigned NOT NULL AUTO_INCREMENT,"+
+		"`metric_id` smallint(5) unsigned NOT NULL,"+
+		"`value` int(11) unsigned NOT NULL,"+
+		"`date` date NOT NULL,"+
+		"PRIMARY KEY (`id`),"+
+		"UNIQUE KEY `monthly_metrics_metric_id_date_unique` (`metric_id`,`date`),"+
+		"KEY `monthly_metrics_metric_id_index` (`metric_id`)"+
+	") ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci"
+	stmt, err := Db.Prepare(sqlStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = stmt.Exec()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	//monthly_slices
+	sqlStr = "CREATE TABLE `monthly_slices` ("+
+	"`id` int(10) unsigned NOT NULL AUTO_INCREMENT,"+
+		"`metric_id` smallint(5) unsigned NOT NULL,"+
+		"`slice_id` smallint(5) unsigned NOT NULL,"+
+		"`value` int(11) unsigned NOT NULL,"+
+		"`date` date NOT NULL,"+
+		"PRIMARY KEY (`id`),"+
+		"UNIQUE KEY `monthly_slices_metric_id_slice_id_date_unique` (`metric_id`,`slice_id`,`date`),"+
+		"KEY `monthly_slices_metric_id_slice_id_index` (`metric_id`,`slice_id`),"+
+		"KEY `metric_date` (`metric_id`,`date`)"+
+	") ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci"
+	stmt, err = Db.Prepare(sqlStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = stmt.Exec()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	//metrics
+	sqlStr = "CREATE TABLE `metrics` ("+
+	"`id` int(10) unsigned NOT NULL AUTO_INCREMENT,"+
+		"`name` varchar(255) COLLATE utf8_unicode_ci NOT NULL,"+
+		"`name_crc_32` int(10) unsigned NOT NULL,"+
+		"PRIMARY KEY (`id`),"+
+		"UNIQUE KEY `metrics_name_unique` (`name`),"+
+		"KEY `metrics_name_crc_32_index` (`name_crc_32`)"+
+	") ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci"
+	stmt, err = Db.Prepare(sqlStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = stmt.Exec()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	//slices
+	sqlStr = "CREATE TABLE `slices` ("+
+	"`id` int(10) unsigned NOT NULL AUTO_INCREMENT,"+
+		"`category` varchar(255) COLLATE utf8_unicode_ci NOT NULL,"+
+		"`category_crc_32` int(10) unsigned NOT NULL,"+
+		"`name` varchar(255) COLLATE utf8_unicode_ci NOT NULL,"+
+		"`name_crc_32` int(10) unsigned NOT NULL,"+
+		"PRIMARY KEY (`id`),"+
+		"KEY `slices_category_crc_32_name_crc_32_index` (`category_crc_32`,`name_crc_32`)"+
+	") ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci"
+	stmt, err = Db.Prepare(sqlStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = stmt.Exec()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func warmupMetricsCache() {

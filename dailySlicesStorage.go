@@ -90,7 +90,7 @@ func (storage *DailySlicesStorage) FlushToDb() int {
 				" (`id` int(10) unsigned NOT NULL AUTO_INCREMENT," +
 				"`metric_id` smallint(5) unsigned NOT NULL," +
 				"`slice_id` smallint(5) unsigned NOT NULL," +
-				"`value` int(11) NOT NULL," +
+				"`value` int(11) unsigned NOT NULL," +
 				"`minute` smallint(5) unsigned NOT NULL," +
 				"PRIMARY KEY (`id`)," +
 				"UNIQUE KEY " + uniqueName + " (`metric_id`,`slice_id`,`minute`)," +

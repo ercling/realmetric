@@ -64,6 +64,10 @@ func (storage *DailyMetricsTotalsStorage) FlushToDb() int {
 	}
 	log.Println(time.Now().Format("15:04:05 ") + "Flushing DailyMetricsTotalsStorage")
 
+	//monthly_metrics
+
+
+
 	tableCreated := false
 	for dateKey, values := range storage.tmpStorageElements {
 		log.Println("DailyMetricsTotalsStorage dk("+strconv.Itoa(len(values))+")")
@@ -74,7 +78,7 @@ func (storage *DailyMetricsTotalsStorage) FlushToDb() int {
 			sqlStr := "CREATE TABLE IF NOT EXISTS " + tableName +
 				" (`id` int(10) unsigned NOT NULL AUTO_INCREMENT," +
 				"`metric_id` smallint(5) unsigned NOT NULL," +
-				"`value` int(11) NOT NULL," +
+				"`value` int(11) unsigned NOT NULL," +
 				"`diff` float NOT NULL DEFAULT '0'," +
 				"PRIMARY KEY (`id`)," +
 				"UNIQUE KEY " + uniqueName + " (`metric_id`)" +

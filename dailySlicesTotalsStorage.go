@@ -73,17 +73,19 @@ func (storage *DailySlicesTotalsStorage) FlushToDb() int {
 				" (`id` int(10) unsigned NOT NULL AUTO_INCREMENT," +
 				"`metric_id` smallint(5) unsigned NOT NULL," +
 				"`slice_id` smallint(5) unsigned NOT NULL," +
-				"`value` int(11) NOT NULL," +
+				"`value` int(11) unsigned NOT NULL," +
 				"`diff` float NOT NULL DEFAULT '0'," +
 				"PRIMARY KEY (`id`)," +
 				"UNIQUE KEY " + uniqueName + " (`metric_id`,`slice_id`)" +
 				") ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci"
-			//TODO: add error log here
 			stmt, err := Db.Prepare(sqlStr)
 			if err != nil {
 				log.Fatal(err)
 			}
-			stmt.Exec()
+			_, err = stmt.Exec()
+			if err != nil {
+				log.Fatal(err)
+			}
 			tableCreated = true
 		}
 
