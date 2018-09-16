@@ -34,7 +34,7 @@ var Conf *Config
 
 type InsertData struct {
 	TableName string
-	Fields []string
+	Fields    []string
 	Values    []interface{}
 }
 
@@ -44,42 +44,44 @@ func (portions *InsertData) AppendValues(args ...interface{}) {
 
 func (portions *InsertData) InsertIncrementBatch() {
 	portionCount := 40000
+	portionCount = portionCount - (portionCount % len(portions.Fields))
+
 	currPortionNumber := 0
-	countOfPortions := int(math.Ceil(float64(cap(portions.Values)) / float64(portionCount)))
+	countOfPortions := int(math.Ceil(float64(len(portions.Values)) / float64(portionCount)))
 
 	for currPortionNumber < countOfPortions {
 		startSlice := portionCount * currPortionNumber
 		endSlice := portionCount * (currPortionNumber + 1)
 
-		currCap := cap(portions.Values)
+		currCap := len(portions.Values)
 		if currCap < endSlice {
 			endSlice = currCap
 		}
 		Slice := portions.Values[startSlice:endSlice]
-		groupRepeatCount := (endSlice-startSlice) / len(portions.Fields)
-		log.Println("endSlice: "+strconv.Itoa(endSlice)+" startSlice: "+strconv.Itoa(startSlice)+" portionLenFields: "+strconv.Itoa(len(portions.Fields))+" SlicesLen:"+strconv.Itoa(len(Slice)))
+		groupRepeatCount := len(Slice) / len(portions.Fields)
+		log.Println("endSlice: " + strconv.Itoa(endSlice) + " startSlice: " + strconv.Itoa(startSlice) + " portionLenFields: " + strconv.Itoa(len(portions.Fields)) + " SlicesLen:" + strconv.Itoa(len(Slice)))
 		fieldsStr := strings.Join(portions.Fields, ",")
-		SqlStr := "INSERT INTO " + portions.TableName + " ("+fieldsStr+") VALUES "
+		SqlStr := "INSERT INTO " + portions.TableName + " (" + fieldsStr + ") VALUES "
 
 		questionGroup := strings.Repeat("?,", len(portions.Fields))
-		questionGroup = questionGroup[0:len(questionGroup)-1]
-		SqlStr += strings.Repeat("(" + questionGroup + "),", groupRepeatCount)
+		questionGroup = questionGroup[0 : len(questionGroup)-1]
+		SqlStr += strings.Repeat("("+questionGroup+"),", groupRepeatCount)
 		SqlStr = SqlStr[0 : len(SqlStr)-1]
 		SqlStr += " ON DUPLICATE KEY UPDATE `value` = `value` + VALUES(`value`)"
-		if portions.TableName=="daily_metric_totals_2018_09_13" {
-			log.Println(SqlStr)
-		}
 
 		stmt, err := Db.Prepare(SqlStr)
 		if err != nil {
+			log.Print("Table: " + portions.TableName + " ")
 			log.Panic(err)
 		}
 		_, err = stmt.Exec(Slice...)
 		if err != nil {
+			log.Print("Table: " + portions.TableName + " ")
 			log.Println(err)
 			bytesJ, _ := json.Marshal(Slice)
 			log.Println(string(bytesJ))
-
+		} else {
+			log.Println("Inserted")
 		}
 
 		currPortionNumber++
@@ -106,74 +108,68 @@ type Event struct {
 }
 
 func (sc *slicesCache) GetSliceIdByCategoryAndName(category string, name string) (int, error) {
+	sc.mu.Lock()
 	sliceId, ok := sc.cache[category][name]
-	if !ok {
-		sc.mu.Lock()
-		sliceId, ok = sc.cache[category][name]
-		if ok {
-			sc.mu.Unlock()
-			return sliceId, nil
-		}
-
-		crc32category := crc32.ChecksumIEEE([]byte(category))
-		crc32name := crc32.ChecksumIEEE([]byte(name))
-		var id int
-		err := Db.QueryRow("SELECT id FROM slices WHERE category_crc_32=? AND name_crc_32=?", crc32category, crc32name).Scan(&id)
-		if err != nil {
-			//create id
-			stmt, es := Db.Prepare("INSERT IGNORE INTO slices (category, category_crc_32, name, name_crc_32) VALUES (?, ?, ?, ?)")
-			if es != nil {
-				log.Panic(es)
-			}
-			result, err := stmt.Exec(category, crc32category, name, crc32name)
-			if err != nil {
-				log.Panic(err)
-			}
-			insertId, _ := result.LastInsertId()
-			id = int(insertId)
-		}
-		sliceId = id
-		if _, ok = sc.cache[category]; !ok{
-			sc.cache[category] = make(map[string]int)
-		}
-		sc.cache[category][name] = sliceId
+	if ok {
 		sc.mu.Unlock()
+		return sliceId, nil
 	}
+
+	crc32category := crc32.ChecksumIEEE([]byte(category))
+	crc32name := crc32.ChecksumIEEE([]byte(name))
+	var id int
+	err := Db.QueryRow("SELECT id FROM slices WHERE category_crc_32=? AND name_crc_32=?", crc32category, crc32name).Scan(&id)
+	if err != nil {
+		//create id
+		stmt, es := Db.Prepare("INSERT IGNORE INTO slices (category, category_crc_32, name, name_crc_32) VALUES (?, ?, ?, ?)")
+		if es != nil {
+			log.Panic(es)
+		}
+		result, err := stmt.Exec(category, crc32category, name, crc32name)
+		if err != nil {
+			log.Panic(err)
+		}
+		insertId, _ := result.LastInsertId()
+		id = int(insertId)
+	}
+	sliceId = id
+	if _, ok = sc.cache[category]; !ok {
+		sc.cache[category] = make(map[string]int)
+	}
+	sc.cache[category][name] = sliceId
+	sc.mu.Unlock()
 	return sliceId, nil
 }
 
 func (mc *metricsCache) GetMetricIdByName(metricName string) (int, error) {
+	mc.mu.Lock()
 	metricId, ok := mc.cache[metricName]
-	if !ok {
-		mc.mu.Lock()
-		metricId, ok = mc.cache[metricName]
-		if ok {
-			mc.mu.Unlock()
-			return metricId, nil
-		}
-		crc32name := crc32.ChecksumIEEE([]byte(metricName))
-		var id int
-
-		err := Db.QueryRow("SELECT id from metrics where name_crc_32=?", crc32name).Scan(&id)
-
-		if err != nil {
-			//create id
-			stmt, es := Db.Prepare("INSERT IGNORE INTO metrics (name, name_crc_32) VALUES (?, ?)")
-			if es != nil {
-				log.Panic(es)
-			}
-			result, err := stmt.Exec(metricName, crc32name)
-			if err != nil {
-				log.Panic(err)
-			}
-			insertId, _ := result.LastInsertId()
-			id = int(insertId)
-		}
-
-		metricId = id
-		mc.cache[metricName] = metricId
+	if ok {
 		mc.mu.Unlock()
+		return metricId, nil
 	}
+	crc32name := crc32.ChecksumIEEE([]byte(metricName))
+	var id int
+
+	err := Db.QueryRow("SELECT id from metrics where name_crc_32=?", crc32name).Scan(&id)
+
+	if err != nil {
+		//create id
+		stmt, es := Db.Prepare("INSERT IGNORE INTO metrics (name, name_crc_32) VALUES (?, ?)")
+		if es != nil {
+			log.Panic(es)
+		}
+		result, err := stmt.Exec(metricName, crc32name)
+		if err != nil {
+			log.Panic(err)
+		}
+		insertId, _ := result.LastInsertId()
+		id = int(insertId)
+	}
+
+	metricId = id
+	mc.cache[metricName] = metricId
+	mc.mu.Unlock()
 	return metricId, nil
 }
 
@@ -425,7 +421,7 @@ func main() {
 	})
 	authorized.POST("/track", trackHandler)
 	if Conf.Gin.TlsEnabled {
-		server.RunTLS(Conf.Gin.Host + ":" + strconv.Itoa(Conf.Gin.Port), Conf.Gin.TlsCertFilePath, Conf.Gin.TlsKeyFilePath)
+		server.RunTLS(Conf.Gin.Host+":"+strconv.Itoa(Conf.Gin.Port), Conf.Gin.TlsCertFilePath, Conf.Gin.TlsKeyFilePath)
 	} else {
 		server.Run(Conf.Gin.Host + ":" + strconv.Itoa(Conf.Gin.Port))
 	}
@@ -439,7 +435,6 @@ func aggregateEvents(tracks []Event) int {
 	}
 
 	counter := 0
-	//DailySlicesStore.Lock()
 	for _, event := range tracks {
 		if r.MatchString(event.Metric) {
 			log.Println("Skip invalid metric: " + event.Metric)
@@ -459,7 +454,7 @@ func aggregateEvents(tracks []Event) int {
 			continue
 		}
 
-		for category, name := range event.Slices{
+		for category, name := range event.Slices {
 			sliceId, err := SlicesCache.GetSliceIdByCategoryAndName(category, name)
 			if err != nil {
 				log.Println("Cannot get metric id: " + event.Metric)
@@ -469,9 +464,7 @@ func aggregateEvents(tracks []Event) int {
 			DailySlicesTotals.Inc(metricId, sliceId, event)
 		}
 
-
 	}
-	//DailySlicesStore.Unlock()
 	return counter
 }
 
