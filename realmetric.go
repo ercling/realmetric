@@ -8,13 +8,11 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/gorilla/mux"
 	"hash/crc32"
 	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
-	"net/http/pprof"
 	"os"
 	"regexp"
 	"strconv"
@@ -177,15 +175,10 @@ func (mc *metricsCache) GetMetricIdByName(metricName string) (int, error) {
 func (td *Event) FillMinute() error {
 	time := time2.Unix(td.Time, 0)
 
-	time, err := LocalTime(time)
-	if err != nil {
-		log.Panic(err)
-	}
 	td.Minute = time.Hour()*60 + time.Minute()
 	return nil
 }
 
-//func handler(w http.ResponseWriter, r *http.Request) {
 func trackHandler(c *gin.Context) {
 	startTime := time2.Now()
 	body, err := ioutil.ReadAll(c.Request.Body)
@@ -218,54 +211,6 @@ func trackHandler(c *gin.Context) {
 		})
 		return
 	}
-
-	//for _, value := range jsonData {
-	//	track := Event{}
-	//	metric, ok := value["metric"]
-	//	if !ok {
-	//		log.Println("Skipped: No metric")
-	//		continue
-	//	}
-	//	track.Metric, ok = metric.(string)
-	//	if !ok {
-	//		log.Println("Skipped: Cant cast metric to string")
-	//		continue
-	//	}
-	//
-	//	metricVal, ok := value["value"]
-	//	if !ok {
-	//		log.Println("Skipped: no metricVal")
-	//		continue
-	//	}
-	//	mv := metricVal.(float64)
-	//	if !ok {
-	//		log.Println("Skipped: Cant cast value to float64")
-	//		continue
-	//	}
-	//	track.Value = int(mv)
-	//
-	//	valTime := time2.Now().Unix()
-	//	metricTime, ok := value["time"]
-	//	if ok {
-	//		valT, ok := metricTime.(float64)
-	//		if ok {
-	//			valTime = int64(valT)
-	//		}
-	//	}
-	//	track.Time = valTime
-	//
-	//	slices, ok := value["slices"]
-	//	if ok {
-	//		slc := make(map[string]string)
-	//		for category, sliceVal := range slices.(map[string]interface{}) {
-	//			slc[category] = sliceVal.(string)
-	//		}
-	//		track.Slices = slc
-	//	}
-	//
-	//	tracks = append(tracks, track)
-	//
-	//}
 
 	go aggregateEvents(tracks)
 
@@ -446,28 +391,6 @@ func warmupSlicesCache() {
 }
 
 func main() {
-	//DailySlicesTotals = DailySlicesTotalsStorage{}
-	//DailyMetricsStore = DailyMetricsStorage{}
-	//DailyMetricsTotals = DailyMetricsTotalsStorage{}
-	//DailySlicesStore = DailySlicesStorage{}
-	//DailySlicesTotals = DailySlicesTotalsStorage{}
-
-	go func() {
-		debugR := mux.NewRouter()
-		debugR.HandleFunc("/debug/pprof/", pprof.Index)
-		debugR.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-		debugR.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		debugR.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-		debugR.Handle("/debug/pprof/heap", pprof.Handler("heap"))
-		debugR.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
-		debugR.Handle("/debug/pprof/block", pprof.Handler("block"))
-		debugR.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
-		err := http.ListenAndServe("localhost:6060", debugR)
-		if err != nil {
-			log.Println(err)
-		}
-	}()
-
 	//start flush daily_metrics ticker
 	ticker := time2.NewTicker(time2.Duration(Conf.FlushToDbInterval) * time2.Second)
 	go func() {
@@ -547,12 +470,4 @@ func aggregateEvents(tracks []Event) int {
 
 	}
 	return counter
-}
-
-func LocalTime(t time2.Time) (time2.Time, error) {
-	//loc, err := time2.LoadLocation(Conf.TimeZone)
-	//if err == nil {
-	//	t = t.In(loc)
-	//}
-	return t, nil
 }

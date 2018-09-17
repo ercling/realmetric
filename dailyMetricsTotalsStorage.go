@@ -21,10 +21,7 @@ func (storage *DailyMetricsTotalsStorage) Inc(metricId int, event Event) bool {
 
 	var key int
 	eventTime := time.Unix(event.Time, 0)
-	eventTime, err := LocalTime(eventTime)
-	if err != nil {
-		log.Panic(err)
-	}
+
 	dateKey := eventTime.Format("2006_01_02")
 	key = metricId
 	_, ok := storage.storageElements[dateKey]

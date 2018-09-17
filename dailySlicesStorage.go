@@ -34,10 +34,7 @@ func (storage *DailySlicesStorage) Inc(metricId int, sliceId int, event Event) b
 	storage.mu.Lock()
 	var key string
 	eventTime := time.Unix(event.Time, 0)
-	eventTime, err := LocalTime(eventTime)
-	if err != nil {
-		log.Panic(err)
-	}
+
 	dateKey := eventTime.Format("2006_01_02")
 	key = strconv.Itoa(metricId) + "_" + strconv.Itoa(sliceId) + "_" + strconv.Itoa(event.Minute)
 	_, ok := storage.storageElements[dateKey]
