@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -64,6 +65,7 @@ func (storage *DailySlicesTotalsStorage) FlushToDb() int {
 	tableCreated := false
 	for dateKey, values := range storage.tmpStorageElements {
 		log.Println("DailySlicesTotals dk("+strconv.Itoa(len(values))+")")
+		date := strings.Replace(dateKey, "_", "-", -1)
 		tableName := "daily_slice_totals_" + dateKey
 		//create table
 		if !tableCreated {
@@ -93,11 +95,16 @@ func (storage *DailySlicesTotalsStorage) FlushToDb() int {
 		insertData := InsertData{
 			TableName: tableName,
 			Fields:    []string{"metric_id", "slice_id", "value"}}
+		insertData2 := InsertData{
+			TableName: "monthly_slices",
+			Fields:    []string{"metric_id", "slice_id", "value", "date"}}
 
 		for _, dailySlice := range values {
 			insertData.AppendValues(dailySlice.metricId, dailySlice.sliceId, dailySlice.value)
+			insertData2.AppendValues(dailySlice.metricId, dailySlice.sliceId, dailySlice.value, date)
 		}
 		insertData.InsertIncrementBatch()
+		insertData2.InsertIncrementBatch()
 
 	}
 	storage.tmpStorageElements = nil
